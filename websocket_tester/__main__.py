@@ -1,12 +1,13 @@
-from argparse import ArgumentParser
+from argparse import ArgumentParser, BooleanOptionalAction
 import json
+import ssl
 import time
 
 from websockets.sync.client import connect
 
 
 # See response to https://hypothes.is/api/links for WebSocket endpoint.
-def run_test(endpoint="wss://h-websocket.hypothes.is/ws"):
+def run_test(endpoint="wss://h-websocket.hypothes.is/ws", ssl_verify=True):
     print(f"Connecting to {endpoint}...")
 
     max_attempts = 100
@@ -15,10 +16,17 @@ def run_test(endpoint="wss://h-websocket.hypothes.is/ws"):
     next_msg_id = 0
     timeout = 3
 
+    if not ssl_verify:
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+    else:
+        ssl_context = None  # Use default
+
     for n_attempt in range(max_attempts):
         next_msg_id += 1
         print(f"Attempt {n_attempt} of {max_attempts}..")
-        with connect(endpoint) as websocket:
+        with connect(endpoint, ssl_context=ssl_context) as websocket:
             # Simple ping-pong test, to verify the connection was established.
             try:
                 pong_event = websocket.ping()
@@ -53,9 +61,15 @@ def main():
         help="H WebSocket endpoint",
         default="wss://h-websocket.hypothes.is/ws",
     )
+    parser.add_argument(
+        "--ssl-verify",
+        action=BooleanOptionalAction,
+        help="Whether to enable SSL verification",
+        default=True,
+    )
     args = parser.parse_args()
 
-    run_test(args.endpoint)
+    run_test(args.endpoint, ssl_verify=args.ssl_verify)
 
 
 main()
